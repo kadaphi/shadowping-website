@@ -894,10 +894,11 @@
 
   <script>
   // Force scroll to top on load
-  window.onload = function() { window.scrollTo(0, 0); }
-</script>
-  
-<script>
+  if (history.scrollRestoration) {
+    history.scrollRestoration = 'manual';
+  }
+  window.scrollTo(0, 0);
+
   // Scroll reveal
   const reveals = document.querySelectorAll('.reveal');
   const observer = new IntersectionObserver((entries) => {
@@ -909,5 +910,6 @@
   }, { threshold: 0.1 });
   reveals.forEach(el => observer.observe(el));
 </script>
+
 </body>
 </html>

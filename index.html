@@ -1,0 +1,909 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="color-scheme" content="dark" />
+  <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+  <title>ShadowPing — Discord Member Intelligence</title>
+  <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Sans:ital,wght@0,300;0,400;0,500;1,300&display=swap" rel="stylesheet" />
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      color-scheme: dark;
+      --navy: #050810;
+      --navy2: #090d1e;
+      --card: #0d1228;
+      --card2: #111730;
+      --cyan: #00d4f5;
+      --cyan2: #00b8d9;
+      --violet: #8b5cf6;
+      --violet2: #6d3fc4;
+      --text: #e8ecf8;
+      --muted: #7a85a8;
+      --border: rgba(0,212,245,0.12);
+    }
+
+    html { scroll-behavior: smooth; }
+
+    body {
+      background: var(--navy);
+      color: var(--text);
+      font-family: 'DM Sans', sans-serif;
+      font-size: 16px;
+      line-height: 1.7;
+      overflow-x: hidden;
+    }
+
+    /* ── NOISE TEXTURE OVERLAY ── */
+    body::before {
+      content: '';
+      position: fixed;
+      inset: 0;
+      background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.04'/%3E%3C/svg%3E");
+      pointer-events: none;
+      z-index: 0;
+      opacity: 0.5;
+    }
+
+    /* ── GRID LINES ── */
+    body::after {
+      content: '';
+      position: fixed;
+      inset: 0;
+      background-image:
+        linear-gradient(rgba(0,212,245,0.03) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(0,212,245,0.03) 1px, transparent 1px);
+      background-size: 60px 60px;
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    /* ── GLOW ORBS ── */
+    .orb {
+      position: fixed;
+      border-radius: 50%;
+      filter: blur(120px);
+      pointer-events: none;
+      z-index: 0;
+    }
+    .orb-1 { width: 600px; height: 600px; background: rgba(0,180,220,0.07); top: -200px; left: -150px; }
+    .orb-2 { width: 500px; height: 500px; background: rgba(139,92,246,0.07); bottom: -100px; right: -100px; }
+    .orb-3 { width: 300px; height: 300px; background: rgba(0,212,245,0.05); top: 50%; left: 50%; transform: translate(-50%,-50%); }
+
+    /* ── NAV ── */
+    nav {
+      position: fixed;
+      top: 0; left: 0; right: 0;
+      z-index: 100;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 20px 60px;
+      background: rgba(5,8,16,0.8);
+      backdrop-filter: blur(20px);
+      border-bottom: 1px solid var(--border);
+    }
+
+    .nav-logo {
+      font-family: 'Syne', sans-serif;
+      font-weight: 800;
+      font-size: 1.3rem;
+      color: var(--text);
+      letter-spacing: -0.5px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .nav-logo .dot {
+      width: 8px; height: 8px;
+      border-radius: 50%;
+      background: var(--cyan);
+      box-shadow: 0 0 12px var(--cyan);
+      animation: pulse 2s ease-in-out infinite;
+    }
+
+    @keyframes pulse {
+      0%, 100% { opacity: 1; transform: scale(1); }
+      50% { opacity: 0.5; transform: scale(0.8); }
+    }
+
+    .nav-links { display: flex; gap: 36px; list-style: none; }
+    .nav-links a {
+      color: var(--muted);
+      text-decoration: none;
+      font-size: 0.9rem;
+      font-weight: 500;
+      transition: color 0.2s;
+    }
+    .nav-links a:hover { color: var(--cyan); }
+
+    /* ── HERO ── */
+    .hero {
+      position: relative;
+      z-index: 1;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+      padding: 140px 40px 80px;
+    }
+
+    .hero-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      background: rgba(0,212,245,0.08);
+      border: 1px solid rgba(0,212,245,0.2);
+      border-radius: 100px;
+      padding: 6px 18px;
+      font-size: 0.78rem;
+      font-weight: 500;
+      color: var(--cyan);
+      letter-spacing: 0.8px;
+      text-transform: uppercase;
+      margin-bottom: 32px;
+      animation: fadeUp 0.8s ease both;
+    }
+
+    .hero-badge::before {
+      content: '';
+      width: 6px; height: 6px;
+      border-radius: 50%;
+      background: var(--cyan);
+      box-shadow: 0 0 8px var(--cyan);
+      animation: pulse 1.5s ease-in-out infinite;
+    }
+
+    .hero h1 {
+      font-family: 'Syne', sans-serif;
+      font-size: clamp(3rem, 8vw, 6.5rem);
+      font-weight: 800;
+      line-height: 1.0;
+      letter-spacing: -3px;
+      max-width: 900px;
+      animation: fadeUp 0.9s ease 0.1s both;
+    }
+
+    .hero h1 .grad {
+      background: linear-gradient(135deg, var(--cyan) 0%, #00e5cc 40%, var(--violet) 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+
+    .hero-sub {
+      max-width: 600px;
+      margin: 28px auto 0;
+      font-size: 1.15rem;
+      color: var(--muted);
+      font-weight: 300;
+      line-height: 1.8;
+      animation: fadeUp 1s ease 0.2s both;
+    }
+
+    .hero-actions {
+      display: flex;
+      gap: 16px;
+      margin-top: 48px;
+      flex-wrap: wrap;
+      justify-content: center;
+      animation: fadeUp 1s ease 0.3s both;
+    }
+
+    .btn-primary {
+      display: inline-flex;
+      align-items: center;
+      gap: 10px;
+      background: linear-gradient(135deg, var(--cyan), #00b8cc);
+      color: #050810;
+      font-family: 'Syne', sans-serif;
+      font-weight: 700;
+      font-size: 0.95rem;
+      padding: 16px 36px;
+      border-radius: 12px;
+      text-decoration: none;
+      transition: all 0.3s;
+      box-shadow: 0 0 40px rgba(0,212,245,0.25);
+      letter-spacing: 0.3px;
+    }
+
+    .btn-primary:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 0 60px rgba(0,212,245,0.4);
+    }
+
+    .btn-secondary {
+      display: inline-flex;
+      align-items: center;
+      gap: 10px;
+      background: transparent;
+      color: var(--text);
+      font-family: 'Syne', sans-serif;
+      font-weight: 600;
+      font-size: 0.95rem;
+      padding: 16px 36px;
+      border-radius: 12px;
+      text-decoration: none;
+      border: 1px solid var(--border);
+      transition: all 0.3s;
+    }
+
+    .btn-secondary:hover {
+      border-color: rgba(139,92,246,0.4);
+      background: rgba(139,92,246,0.06);
+      transform: translateY(-2px);
+    }
+
+    /* ── STATS STRIP ── */
+    .stats {
+      position: relative;
+      z-index: 1;
+      display: flex;
+      justify-content: center;
+      gap: 0;
+      padding: 0 40px 100px;
+      flex-wrap: wrap;
+    }
+
+    .stat {
+      text-align: center;
+      padding: 28px 60px;
+      border-right: 1px solid var(--border);
+      animation: fadeUp 1s ease 0.4s both;
+    }
+    .stat:last-child { border-right: none; }
+
+    .stat-num {
+      font-family: 'Syne', sans-serif;
+      font-size: 2.4rem;
+      font-weight: 800;
+      background: linear-gradient(135deg, var(--cyan), var(--violet));
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+
+    .stat-label { color: var(--muted); font-size: 0.82rem; font-weight: 400; margin-top: 4px; letter-spacing: 0.5px; }
+
+    /* ── SECTION ── */
+    section { position: relative; z-index: 1; padding: 100px 40px; max-width: 1200px; margin: 0 auto; }
+
+    .section-label {
+      font-size: 0.75rem;
+      font-weight: 600;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      color: var(--cyan);
+      margin-bottom: 16px;
+    }
+
+    .section-title {
+      font-family: 'Syne', sans-serif;
+      font-size: clamp(2rem, 4vw, 3rem);
+      font-weight: 800;
+      letter-spacing: -1.5px;
+      line-height: 1.1;
+      max-width: 700px;
+    }
+
+    .section-body {
+      color: var(--muted);
+      font-size: 1.05rem;
+      max-width: 680px;
+      margin-top: 20px;
+      line-height: 1.9;
+      font-weight: 300;
+    }
+
+    /* ── ABOUT ── */
+    .about-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 80px;
+      align-items: center;
+      margin-top: 20px;
+    }
+
+    .about-visual {
+      position: relative;
+      height: 380px;
+      border-radius: 24px;
+      background: var(--card);
+      border: 1px solid var(--border);
+      overflow: hidden;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .about-visual::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background: radial-gradient(ellipse at 30% 40%, rgba(0,212,245,0.08) 0%, transparent 60%),
+                  radial-gradient(ellipse at 70% 60%, rgba(139,92,246,0.06) 0%, transparent 60%);
+    }
+
+    .eye-icon {
+      width: 160px;
+      height: 160px;
+      position: relative;
+    }
+
+    .eye-ring {
+      position: absolute;
+      border-radius: 50%;
+      border: 1.5px solid;
+      animation: spin linear infinite;
+    }
+
+    .eye-ring-1 { inset: 0; border-color: rgba(0,212,245,0.4); animation-duration: 8s; }
+    .eye-ring-2 { inset: 14px; border-color: rgba(139,92,246,0.3); animation-duration: 6s; animation-direction: reverse; }
+    .eye-ring-3 { inset: 28px; border-color: rgba(0,212,245,0.2); animation-duration: 10s; }
+
+    @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+
+    .eye-core {
+      position: absolute;
+      inset: 40px;
+      border-radius: 50%;
+      background: radial-gradient(circle, #00d4f5 0%, #00b8cc 30%, #8b5cf6 70%, #1a0a3a 100%);
+      box-shadow: 0 0 40px rgba(0,212,245,0.4), inset 0 0 20px rgba(0,0,0,0.5);
+    }
+
+    .eye-highlight {
+      position: absolute;
+      width: 22px;
+      height: 22px;
+      background: white;
+      border-radius: 50%;
+      top: 44px;
+      left: 52px;
+      opacity: 0.9;
+      filter: blur(2px);
+    }
+
+    /* ── FEATURES ── */
+    .features-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 24px;
+      margin-top: 60px;
+    }
+
+    .feature-card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 20px;
+      padding: 36px 32px;
+      transition: all 0.3s;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .feature-card::before {
+      content: '';
+      position: absolute;
+      top: 0; left: 0; right: 0;
+      height: 1px;
+      background: linear-gradient(90deg, transparent, var(--cyan), transparent);
+      opacity: 0;
+      transition: opacity 0.3s;
+    }
+
+    .feature-card:hover {
+      border-color: rgba(0,212,245,0.25);
+      transform: translateY(-4px);
+      background: var(--card2);
+    }
+
+    .feature-card:hover::before { opacity: 1; }
+
+    .feature-icon {
+      width: 48px; height: 48px;
+      border-radius: 12px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1.4rem;
+      margin-bottom: 20px;
+    }
+
+    .feature-icon.cyan { background: rgba(0,212,245,0.1); border: 1px solid rgba(0,212,245,0.2); }
+    .feature-icon.violet { background: rgba(139,92,246,0.1); border: 1px solid rgba(139,92,246,0.2); }
+    .feature-icon.teal { background: rgba(0,200,180,0.1); border: 1px solid rgba(0,200,180,0.2); }
+
+    .feature-card h3 {
+      font-family: 'Syne', sans-serif;
+      font-size: 1.05rem;
+      font-weight: 700;
+      margin-bottom: 10px;
+      letter-spacing: -0.3px;
+    }
+
+    .feature-card p { color: var(--muted); font-size: 0.9rem; line-height: 1.7; font-weight: 300; }
+
+    /* ── PLANS ── */
+    .plans-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 24px;
+      margin-top: 60px;
+      max-width: 800px;
+    }
+
+    .plan-card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 24px;
+      padding: 40px 36px;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .plan-card.featured {
+      border-color: rgba(139,92,246,0.4);
+      background: linear-gradient(135deg, rgba(139,92,246,0.08) 0%, var(--card) 60%);
+    }
+
+    .plan-card.featured::before {
+      content: 'MOST POPULAR';
+      position: absolute;
+      top: 20px; right: 20px;
+      font-size: 0.65rem;
+      font-weight: 700;
+      letter-spacing: 1.5px;
+      color: var(--violet);
+      background: rgba(139,92,246,0.12);
+      border: 1px solid rgba(139,92,246,0.25);
+      border-radius: 100px;
+      padding: 4px 12px;
+    }
+
+    .plan-name {
+      font-family: 'Syne', sans-serif;
+      font-size: 1.3rem;
+      font-weight: 800;
+      margin-bottom: 8px;
+    }
+
+    .plan-price {
+      font-family: 'Syne', sans-serif;
+      font-size: 2.8rem;
+      font-weight: 800;
+      line-height: 1;
+      margin: 16px 0 4px;
+    }
+
+    .plan-price.cyan { color: var(--cyan); }
+    .plan-price.violet { color: var(--violet); }
+
+    .plan-period { color: var(--muted); font-size: 0.85rem; margin-bottom: 28px; }
+
+    .plan-features { list-style: none; }
+    .plan-features li {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 8px 0;
+      font-size: 0.9rem;
+      color: var(--muted);
+      border-bottom: 1px solid rgba(255,255,255,0.04);
+    }
+    .plan-features li:last-child { border-bottom: none; }
+
+    .plan-features li::before {
+      content: '✓';
+      color: var(--cyan);
+      font-weight: 700;
+      flex-shrink: 0;
+    }
+
+    /* ── TELEGRAM SECTION ── */
+    .telegram-section {
+      background: linear-gradient(135deg, rgba(0,212,245,0.05) 0%, rgba(139,92,246,0.05) 100%);
+      border: 1px solid var(--border);
+      border-radius: 32px;
+      padding: 80px 60px;
+      text-align: center;
+      position: relative;
+      overflow: hidden;
+      margin: 0 40px;
+      max-width: 1120px;
+      margin-left: auto;
+      margin-right: auto;
+    }
+
+    .telegram-section::before {
+      content: '';
+      position: absolute;
+      top: -1px; left: 10%; right: 10%;
+      height: 1px;
+      background: linear-gradient(90deg, transparent, var(--cyan), var(--violet), transparent);
+    }
+
+    .telegram-icon {
+      width: 80px; height: 80px;
+      border-radius: 20px;
+      background: linear-gradient(135deg, #229ED9, #1a7ab5);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 2.2rem;
+      margin: 0 auto 28px;
+      box-shadow: 0 0 40px rgba(34,158,217,0.3);
+    }
+
+    .telegram-section h2 {
+      font-family: 'Syne', sans-serif;
+      font-size: clamp(1.8rem, 3vw, 2.6rem);
+      font-weight: 800;
+      letter-spacing: -1px;
+      margin-bottom: 16px;
+    }
+
+    .telegram-section p {
+      color: var(--muted);
+      max-width: 560px;
+      margin: 0 auto 36px;
+      font-size: 1rem;
+      line-height: 1.8;
+      font-weight: 300;
+    }
+
+    .telegram-features {
+      display: flex;
+      justify-content: center;
+      gap: 32px;
+      margin-bottom: 40px;
+      flex-wrap: wrap;
+    }
+
+    .tg-feature {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 0.88rem;
+      color: var(--muted);
+    }
+
+    .tg-feature::before {
+      content: '';
+      width: 6px; height: 6px;
+      border-radius: 50%;
+      background: var(--cyan);
+      flex-shrink: 0;
+    }
+
+    .btn-telegram {
+      display: inline-flex;
+      align-items: center;
+      gap: 10px;
+      background: linear-gradient(135deg, #229ED9, #1a7ab5);
+      color: white;
+      font-family: 'Syne', sans-serif;
+      font-weight: 700;
+      font-size: 1rem;
+      padding: 18px 40px;
+      border-radius: 14px;
+      text-decoration: none;
+      transition: all 0.3s;
+      box-shadow: 0 0 40px rgba(34,158,217,0.25);
+    }
+
+    .btn-telegram:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 0 60px rgba(34,158,217,0.4);
+    }
+
+    /* ── DESCRIPTION ── */
+    .desc-section {
+      position: relative;
+      z-index: 1;
+      padding: 100px 40px;
+      max-width: 900px;
+      margin: 0 auto;
+    }
+
+    .desc-section p {
+      color: var(--muted);
+      font-size: 1.05rem;
+      line-height: 2;
+      font-weight: 300;
+      margin-bottom: 24px;
+    }
+
+    .desc-section p:first-of-type {
+      font-size: 1.2rem;
+      color: rgba(232,236,248,0.85);
+    }
+
+    /* ── FOOTER ── */
+    footer {
+      position: relative;
+      z-index: 1;
+      border-top: 1px solid var(--border);
+      padding: 40px 60px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .footer-logo {
+      font-family: 'Syne', sans-serif;
+      font-weight: 800;
+      color: var(--text);
+      font-size: 1.1rem;
+    }
+
+    .footer-note { color: var(--muted); font-size: 0.82rem; }
+
+    /* ── ANIMATIONS ── */
+    @keyframes fadeUp {
+      from { opacity: 0; transform: translateY(24px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    .reveal {
+      opacity: 1;
+      transform: translateY(0);
+      transition: opacity 0.7s ease, transform 0.7s ease;
+    }
+
+    .reveal.visible {
+      opacity: 1;
+      transform: translateY(0);
+    }
+
+    /* ── RESPONSIVE ── */
+    @media (max-width: 900px) {
+      nav { padding: 18px 24px; }
+      .nav-links { display: none; }
+      .about-grid { grid-template-columns: 1fr; gap: 40px; }
+      .features-grid { grid-template-columns: 1fr; }
+      .plans-grid { grid-template-columns: 1fr; }
+      .stat { padding: 20px 30px; }
+      .telegram-section { padding: 50px 28px; margin: 0 16px; }
+      footer { flex-direction: column; gap: 12px; text-align: center; padding: 32px 24px; }
+    }
+  </style>
+</head>
+<body>
+
+<div class="orb orb-1"></div>
+<div class="orb orb-2"></div>
+<div class="orb orb-3"></div>
+
+<!-- NAV -->
+<nav>
+  <div class="nav-logo">
+    <div class="dot"></div>
+    ShadowPing
+  </div>
+  <ul class="nav-links">
+    <li><a href="#about">About</a></li>
+    <li><a href="#features">Features</a></li>
+    <li><a href="#pricing">Pricing</a></li>
+    <li><a href="#community">Community</a></li>
+  </ul>
+  <a href="#download" class="btn-primary" style="padding:10px 24px; font-size:0.85rem;">Download APK</a>
+</nav>
+
+<!-- HERO -->
+<section class="hero">
+  <div class="hero-badge">Discord Intelligence Platform</div>
+  <h1>See Every Member.<br><span class="grad">Before They Leave.</span></h1>
+  <p class="hero-sub">
+    ShadowPing is a next-generation Discord monitoring tool that detects new member joins in real time — giving you the intelligence to act first, connect faster, and grow smarter.
+  </p>
+  <div class="hero-actions">
+    <a href="#download" class="btn-primary">
+      ↓ Download for Android
+    </a>
+    <a href="#community" class="btn-secondary">
+      Join the Community
+    </a>
+  </div>
+</section>
+
+<!-- STATS -->
+<div class="stats">
+  <div class="stat reveal">
+    <div class="stat-num">Real-Time</div>
+    <div class="stat-label">Member Detection</div>
+  </div>
+  <div class="stat reveal">
+    <div class="stat-num">15+</div>
+    <div class="stat-label">Account Slots</div>
+  </div>
+  <div class="stat reveal">
+    <div class="stat-num">100%</div>
+    <div class="stat-label">Crypto Payments</div>
+  </div>
+  <div class="stat reveal">
+    <div class="stat-num">24/7</div>
+    <div class="stat-label">Background Monitoring</div>
+  </div>
+</div>
+
+<!-- ABOUT -->
+<section id="about">
+  <div class="about-grid">
+    <div>
+      <div class="section-label">What is ShadowPing</div>
+      <h2 class="section-title">The Invisible Eye on Your Discord Servers</h2>
+      <p class="section-body">
+        ShadowPing operates silently in the background — a ghost on your Discord servers — watching every new member who walks through the door. The moment someone joins, you know. No delays, no missed opportunities, no manual checking.
+        <br><br>
+        Built for community managers, marketers, and growth operators who understand that timing is everything. When a new member joins your target server, the window to reach them is small. ShadowPing gives you that window — and keeps it open.
+        <br><br>
+        From basic real-time alerts to fully automated Pro-tier friend request outreach, ShadowPing is your silent intelligence layer on Discord.
+      </p>
+    </div>
+    <div class="about-visual">
+      <div class="eye-icon">
+        <div class="eye-ring eye-ring-1"></div>
+        <div class="eye-ring eye-ring-2"></div>
+        <div class="eye-ring eye-ring-3"></div>
+        <div class="eye-core"></div>
+        <div class="eye-highlight"></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- FULL DESCRIPTION -->
+<div class="desc-section reveal">
+  <div class="section-label">Deep Dive</div>
+  <h2 class="section-title" style="margin-bottom:40px;">Built Different. Designed for Results.</h2>
+
+  <p>ShadowPing was built from the ground up with one goal in mind: give operators complete awareness of who is joining Discord communities, and the tools to act on that intelligence instantly. In a space where most tools are clunky bots or complex scripts, ShadowPing brings a clean, mobile-first experience that anyone can use.</p>
+
+  <p>At its core, ShadowPing works by connecting a dedicated Discord account — a "monitor account" — to your chosen servers. This account silently listens for member join events across every server it belongs to. The moment someone joins, the event is captured, processed by our backend, and delivered to your mobile app in real time via WebSocket. No polling, no lag. Just instant awareness.</p>
+
+  <p>For Basic plan users, this means a live feed of every new member across all your monitored servers. You can see who joined, which server they joined, their account age, and when it happened. Each event is logged, browsable, and copyable — so you can take your outreach wherever you need to.</p>
+
+  <p>Pro plan users unlock the full automation stack. Connect dedicated friend request accounts, assign each one to a specific target server, and let ShadowPing handle the rest. When a new member joins your target server, the assigned FR account automatically sends them a friend request — with configurable delays, daily limits, and cooldowns to keep everything safe and natural. You can run multiple accounts simultaneously, each targeting a different server, all managed from one clean interface.</p>
+
+  <p>Security and control are built in. Monitor accounts never send friend requests — they only watch. Friend request accounts are separate, dedicated, and fully controlled by you. Username filters let Pro users exclude certain accounts from outreach. The admin panel gives full control over pricing, user management, subscription codes, and support links — all from within the app.</p>
+
+  <p>Payments are handled through NowPayments, supporting Bitcoin, USDT, Ethereum, Litecoin, and dozens of other cryptocurrencies. Subscriptions are activated instantly on payment, with deep link integration returning users directly to the app. Referral codes reward your community — every referred user that subscribes earns you 3 bonus days automatically.</p>
+
+  <p>ShadowPing is not affiliated with Discord Inc. It is a third-party tool and operates independently. Users are responsible for complying with Discord's Terms of Service when using this application. Use responsibly.</p>
+</div>
+
+<!-- FEATURES -->
+<section id="features">
+  <div class="section-label">Platform Features</div>
+  <h2 class="section-title">Everything You Need.<br>Nothing You Don't.</h2>
+
+  <div class="features-grid">
+    <div class="feature-card reveal">
+      <div class="feature-icon cyan">👁</div>
+      <h3>Real-Time Member Detection</h3>
+      <p>Instant WebSocket-powered alerts the moment a new member joins any of your monitored servers. Zero polling, zero delay — pure live intelligence.</p>
+    </div>
+    <div class="feature-card reveal">
+      <div class="feature-icon violet">⚡</div>
+      <h3>Automated Friend Requests</h3>
+      <p>Pro accounts automatically send friend requests to new joiners on your target servers. Set daily limits, cooldowns, and message delays per account.</p>
+    </div>
+    <div class="feature-card reveal">
+      <div class="feature-icon teal">🔒</div>
+      <h3>Multi-Account Management</h3>
+      <p>Connect up to 15 Discord accounts. Monitor accounts watch all servers silently. FR accounts send outreach to specific server members only.</p>
+    </div>
+    <div class="feature-card reveal">
+      <div class="feature-icon cyan">📱</div>
+      <h3>Push Notifications</h3>
+      <p>Stay informed even when the app is closed. Firebase-powered push notifications deliver join events directly to your device, anytime.</p>
+    </div>
+    <div class="feature-card reveal">
+      <div class="feature-icon violet">🎯</div>
+      <h3>Username Filters</h3>
+      <p>Pro users can filter out specific usernames or patterns from friend request automation — keeping your outreach precise and targeted.</p>
+    </div>
+    <div class="feature-card reveal">
+      <div class="feature-icon teal">💎</div>
+      <h3>Crypto Payments</h3>
+      <p>Subscribe with Bitcoin, USDT, ETH, LTC and more. Payments processed via NowPayments. Subscription activates instantly on confirmation.</p>
+    </div>
+  </div>
+</section>
+
+<!-- PLANS -->
+<section id="pricing">
+  <div class="section-label">Pricing</div>
+  <h2 class="section-title">Simple Plans.<br>Powerful Results.</h2>
+  <p class="section-body">All plans include real-time monitoring, push notifications, member insights, and crypto payments. Choose the duration that works for you — 1 month, 6 months, or 1 year.</p>
+
+  <div class="plans-grid">
+    <div class="plan-card reveal">
+      <div class="plan-name">Basic</div>
+      <div class="plan-price cyan">$10</div>
+      <div class="plan-period">per month · or $50 / 6mo · $100 / year</div>
+      <ul class="plan-features">
+        <li>Real-time member join alerts</li>
+        <li>Member insights — View & Copy</li>
+        <li>Manage server toggles</li>
+        <li>Push notifications</li>
+        <li>Referral bonus days</li>
+      </ul>
+    </div>
+    <div class="plan-card featured reveal">
+      <div class="plan-name">Pro</div>
+      <div class="plan-price violet">$20</div>
+      <div class="plan-period">per month · or $90 / 6mo · $170 / year</div>
+      <ul class="plan-features">
+        <li>Everything in Basic</li>
+        <li>Automated friend requests</li>
+        <li>Friend request log</li>
+        <li>Username filters</li>
+        <li>Custom delays & cooldowns</li>
+        <li>15 account slots</li>
+        <li>Extra slots available (+$10)</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<!-- DOWNLOAD -->
+<section id="download" style="text-align:center;">
+  <div class="section-label" style="text-align:center;">Get the App</div>
+  <h2 class="section-title" style="margin:0 auto 20px; text-align:center;">Download ShadowPing</h2>
+  <p class="section-body" style="margin:0 auto 40px; text-align:center;">
+    Available for Android devices. Download the APK directly and install it on your phone. No Play Store required — just enable "Install from unknown sources" in your Android settings.
+  </p>
+  <!-- REPLACE THE HREF BELOW WITH YOUR ACTUAL APK DOWNLOAD LINK -->
+  <a href="YOUR_APK_DOWNLOAD_LINK_HERE" class="btn-primary reveal" style="font-size:1.05rem; padding:18px 48px;">
+    ↓ Download APK (Android)
+  </a>
+  <p style="color:var(--muted); font-size:0.82rem; margin-top:16px;">Android 6.0+ required · Enable unknown sources to install</p>
+</section>
+
+<!-- TELEGRAM COMMUNITY -->
+<div id="community" style="position:relative; z-index:1; padding: 60px 40px;">
+  <div class="telegram-section reveal">
+    <div class="telegram-icon">✈️</div>
+    <h2>Join the ShadowPing Community</h2>
+    <p>
+      Get step-by-step tutorials on how to set up and use ShadowPing, be the first to know about new features and app updates, and connect with other users in the community. Everything happens on Telegram.
+    </p>
+    <div class="telegram-features">
+      <div class="tg-feature">Setup tutorials & guides</div>
+      <div class="tg-feature">App update announcements</div>
+      <div class="tg-feature">Community support</div>
+      <div class="tg-feature">Pro tips & strategies</div>
+    </div>
+    <!-- REPLACE THE HREF BELOW WITH YOUR TELEGRAM CHANNEL LINK -->
+    <a href="YOUR_TELEGRAM_CHANNEL_LINK_HERE" target="_blank" class="btn-telegram">
+      ✈️ Join on Telegram
+    </a>
+  </div>
+</div>
+
+<!-- FOOTER -->
+<footer>
+  <div class="footer-logo">ShadowPing</div>
+  <div class="footer-note">© 2026 ShadowPing. Independent tool. Not affiliated with Discord Inc.</div>
+</footer>
+
+<script>
+  // Scroll reveal
+  const reveals = document.querySelectorAll('.reveal');
+  const observer = new IntersectionObserver((entries) => {
+    entries.forEach((entry, i) => {
+      if (entry.isIntersecting) {
+        setTimeout(() => entry.target.classList.add('visible'), i * 80);
+      }
+    });
+  }, { threshold: 0.1 });
+  reveals.forEach(el => observer.observe(el));
+</script>
+</body>
+</html>
